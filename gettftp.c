@@ -1,65 +1,130 @@
-#include <stdio.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
+#include "tftp.h"
 
+/*
 
-#define MAXSIZE 500
+int main(int argc, char *argv[]){
 
+    //argv[1] host
+    //argv[2] port
+    //argv[3] file name
 
+    // Check for the correct number of arguments
+    if(argc != 4){
+        printf("There are %d arguments instead of 3\n", argc);
+        return(EXIT_FAILURE);
+    }
+    printf("Sending %s to host: %s@%s\n", argv[3], argv[1], argv[2]);
 
-int main (int argc, char * argv[]){
-    // Socket file descriptor and buffer arrays for host and service names
-    int sfd;
-    char bufferHostName[MAXSIZE];
-    char bufferServiceName[MAXSIZE];
-
-
-    // Structs for storing address information
     struct addrinfo hints;
-    struct addrinfo *result;
+    struct addrinfo *res;
 
-
-    // Verify the correct number of arguments are passed
-    if(argc < 3){
-        printf("\nInsufficient arguments. gettftp.c uses 3 (You must specify the server then the file).\n");
-        exit(EXIT_FAILURE);
+    memset(&hints, 0, sizeof(struct addrinfo)); //sets to 0 our struct addrinfo
+    hints.ai_family = AF_INET; // Specify IPv4
+    hints.ai_protocol = IPPROTO_UDP; // Use UDP protocol
+    int status;
+    status = getaddrinfo(argv[1], argv[2], &hints, &res);
+    // Check the result of getaddrinfo
+    if (status == -1){
+        printf("Cannot find host %s\n", argv[1]);
+        return(EXIT_FAILURE);
     }
 
+    char buffer[MAXSIZE] = {0};
+    char buffer_receive[MAXSIZE] = {0};
+    buffer[1] = 1; // Setting the operation code
+    sprintf(buffer + 2, "%s", argv[3]); // Appends the file name
+    sprintf(buffer + 3 + strlen(argv[3]), "NETASCII"); // Appends the mode
 
-    // Initialize hints structure to zero for safety
-    memset(&hints, 0, sizeof(hints));
+    int sock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    // Check if socket was successfully created
+    if (sock == -1){
+        printf("Error in socket creation.\n");
+        return EXIT_FAILURE;
+    }
+    int bufferSize = 12 + strlen(argv[3]);
 
+    int send = sendto(sock, buffer, bufferSize, 0, res->ai_addr, res->ai_addrlen);
+    // Check if sending the request was successful
+    if (send == -1){
+        printf("Error in sending the request.\n");
+        return EXIT_FAILURE;
+    }
+    // Request has been sent
 
-    // Allow for either IPv4 or IPv6
-    hints.ai_family = AF_UNSPEC;
-    // Datagram socket for UDP connection
-    hints.ai_socktype = SOCK_DGRAM;
-    // No flags specified
-    hints.ai_flags = 0;
-    // Any protocol
-    hints.ai_protocol = 0;
+    struct sockaddr adresse;
+    socklen_t sizeAdress = sizeof(adresse);
+    int nbByte;
 
+    FILE *file;
+    struct stat info;
+    if(stat(argv[3], &info) != 0) {
+        file = fopen(argv[3], "w");
+        // Check if file is successfully opened for writing
+        if (!file) {
+            printf("Error in opening file for writing.\n");
+            return EXIT_FAILURE;
+        }
+    }
+    else {
+        printf("File already exists\n");
+        return EXIT_SUCCESS;
+    }
+    int block = 1;
+    char buff_ok[MAXSIZE] = {0};
+    int send2;
 
-    // Call getaddrinfo() and check for errors
-    int test = getaddrinfo(argv[1],argv[2],&hints,&result);
-    if (test != 0){
-        fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(test));
-        exit(EXIT_FAILURE);
+    while (1) {
+        nbByte = recvfrom(sock, buffer_receive, MAXSIZE, 0, &adresse, &sizeAdress);
+        // Check if receiving data was successful
+        if (nbByte == -1){
+            printf("Error in receiving data.\n");
+            fclose(file);
+            return EXIT_FAILURE;
+        }
+        // Exit loop if no more data is received
+        if (nbByte < 512) {
+            break;
+        }
+
+        printf("Just received %d bytes\n", nbByte); // Reception successful
+
+        if (buffer_receive[0] == 0 && buffer_receive[1] == 5){
+            printf("Error received from server, during block #%d:\n%s\n", buffer_receive[3], buffer_receive + 4);
+            fclose(file);
+            exit(EXIT_SUCCESS);
+        }
+        if (buffer_receive[0] == 0 && buffer_receive[1] == 3){
+            buff_ok[1] = 4; // Acknowledgment operation code
+            buff_ok[2] = 0;
+            buff_ok[3] = block;
+            block++;
+            send2 = sendto(sock, buff_ok, 4, 0, &adresse, sizeAdress); // Send acknowledgment
+            // Check if sending acknowledgment was successful
+            if (send2 == -1){
+                printf("Error in sending acknowledgment.\n");
+                fclose(file);
+                return EXIT_FAILURE;
+            }
+        }
+
+        // Writes our received file
+        fwrite(buffer_receive + 4, sizeof(char), nbByte - 4, file);
+        // Checks if fwrite was successful
+        if (ferror(file)) {
+            printf("Error in writing to file.\n");
+            fclose(file);
+            return EXIT_FAILURE;
+        }
     }
 
+    fclose(file);
 
-    // Retrieve the name information for the server's address
-    getaddrinfo(argv[1], argv[2], &hints, &result);
-    getnameinfo(result->ai_addr, result->ai_addrlen, bufferHostName, MAXSIZE, bufferServiceName, MAXSIZE, NI_DGRAM);
-
-
-    // Print the server's host and service names
-    printf("Server : %s:%s\n",bufferHostName, bufferServiceName);
-
-
-    exit(EXIT_SUCCESS);
+    return 0;
 }
+
+
+*/
+
+
+
+
